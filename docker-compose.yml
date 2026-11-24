@@ -1,0 +1,152 @@
+x-node-healthcheck: &node-healthcheck
+  test:
+    - CMD
+    - node
+    - -e
+    - "fetch('http://127.0.0.1:' + process.env.PORT + '/health').then(response => response.json()).then(body => process.exit(body.status === 'ok' ? 0 : 1)).catch(() => process.exit(1))"
+  interval: 5s
+  timeout: 3s
+  retries: 20
+  start_period: 5s
+
+services:
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    ports:
+      - "${MONGO_PORT:-27018}:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  nginx:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:4000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/proxy_headers.conf:/etc/nginx/proxy_headers.conf:ro
+    depends_on:
+      frontend:
+        condition: service_started
+      auth:
+        condition: service_healthy
+      listings:
+        condition: service_healthy
+      bookings:
+        condition: service_healthy
+      payments:
+        condition: service_healthy
+      messaging:
+        condition: service_healthy
+      notifications:
+        condition: service_healthy
+
+  auth:
+    build: .
+    command: npm run start:auth
+    restart: unless-stopped
+    healthcheck: *node-healthcheck
+    environment:
+      PORT: 4001
+      MONGO_URI: mongodb://mongo:27017
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  listings:
+    build: .
+    command: npm run start:listings
+    restart: unless-stopped
+    healthcheck: *node-healthcheck
+    environment:
+      PORT: 4002
+      MONGO_URI: mongodb://mongo:27017
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      BOOKINGS_URL: http://bookings:4003
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  bookings:
+    build: .
+    command: npm run start:bookings
+    restart: unless-stopped
+    healthcheck: *node-healthcheck
+    environment:
+      PORT: 4003
+      MONGO_URI: mongodb://mongo:27017
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      LISTINGS_URL: http://listings:4002
+    depends_on:
+      mongo:
+        condition: service_healthy
+      listings:
+        condition: service_healthy
+
+  payments:
+    build: .
+    command: npm run start:payments
+    restart: unless-stopped
+    healthcheck: *node-healthcheck
+    environment:
+      PORT: 4004
+      MONGO_URI: mongodb://mongo:27017
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      BOOKINGS_URL: http://bookings:4003
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      bookings:
+        condition: service_healthy
+
+  messaging:
+    build: .
+    command: npm run start:messaging
+    restart: unless-stopped
+    healthcheck: *node-healthcheck
+    environment:
+      PORT: 4005
+      MONGO_URI: mongodb://mongo:27017
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      BOOKINGS_URL: http://bookings:4003
+    depends_on:
+      mongo:
+        condition: service_healthy
+      bookings:
+        condition: service_healthy
+
+  notifications:
+    build: .
+    command: npm run start:notifications
+    restart: unless-stopped
+    healthcheck: *node-healthcheck
+    environment:
+      PORT: 4006
+      MONGO_URI: mongodb://mongo:27017
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  mongo_data:
