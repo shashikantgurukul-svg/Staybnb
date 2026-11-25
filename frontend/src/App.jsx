@@ -26,9 +26,12 @@ const toDateTimeInput = (value) => {
   return date.toISOString().slice(0, 16)
 }
 
+
+const API_URL = import.meta.env.VITE_API_URL || ''
+
 function api(path, options = {}) {
   const token = localStorage.getItem('airbnb_token')
-  return fetch(path, {
+  return fetch(`${API_URL}${path}`, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers },
   }).then(async (response) => {
@@ -37,6 +40,7 @@ function api(path, options = {}) {
     return body
   })
 }
+
 
 function Header({ user, onLogout }) {
   const [open, setOpen] = useState(false)
