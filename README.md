@@ -84,3 +84,15 @@ Protected API calls use `Authorization: Bearer <token>`. Core routes:
 - `GET/POST /api/notifications`, `PATCH /api/notifications/:id/read`
 
 Stop with `docker compose down`. MongoDB data remains in the `mongo_data` volume; `docker compose down -v` removes that data.
+
+## Deploy to Render
+
+The root `render.yaml` deploys the frontend, Nginx gateway, and six API services as a Render Blueprint. The gateway serves the frontend and proxies `/api/...` requests to the APIs, so the browser uses one origin.
+
+1. Create a MongoDB Atlas cluster and database user for this app. Render's free services do not provide stable outbound IPs, so Atlas may require allowing connections from `0.0.0.0/0`. If you do this, use a strong, unique password and a database user restricted to this app's databases; never expose MongoDB itself to the public internet.
+2. Push this repository to GitHub, then in Render choose **New → Blueprint**, select the repository and `main` branch, and apply the `render.yaml` configuration.
+3. When prompted, enter the Atlas connection URI as `MONGO_URI`. Render generates the shared `JWT_SECRET`; keep both values in Render's environment settings and never commit them.
+4. Wait for all seven services to deploy, then open the `staybnb` service URL. Check its `/health` endpoint and try registering an account.
+5. To enable Razorpay, add `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` to the `staybnb-payments` service in Render. Leave them unset to use the demo payment flow.
+
+The Blueprint uses free public web services, so each API also has a public Render URL, and service-to-service calls use those URLs. This is suitable for a demo, not production: free services can sleep, have cold starts and share a monthly usage limit. For production, move the APIs to private services and update their service URLs accordingly.

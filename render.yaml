@@ -1,0 +1,97 @@
+envVarGroups:
+  - name: staybnb-shared
+    envVars:
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+
+services:
+  - type: web
+    name: staybnb
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./nginx/Dockerfile.render
+    dockerContext: .
+    healthCheckPath: /health
+
+  - type: web
+    name: staybnb-auth
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: npm run start:auth
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: staybnb-shared
+
+  - type: web
+    name: staybnb-listings
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: npm run start:listings
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: staybnb-shared
+      - key: BOOKINGS_URL
+        value: https://staybnb-bookings.onrender.com
+
+  - type: web
+    name: staybnb-bookings
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: npm run start:bookings
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: staybnb-shared
+      - key: LISTINGS_URL
+        value: https://staybnb-listings.onrender.com
+
+  - type: web
+    name: staybnb-payments
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: npm run start:payments
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: staybnb-shared
+      - key: BOOKINGS_URL
+        value: https://staybnb-bookings.onrender.com
+
+  - type: web
+    name: staybnb-messaging
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: npm run start:messaging
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: staybnb-shared
+      - key: BOOKINGS_URL
+        value: https://staybnb-bookings.onrender.com
+
+  - type: web
+    name: staybnb-notifications
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: npm run start:notifications
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: staybnb-shared
